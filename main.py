@@ -57,12 +57,11 @@ def _load(filename: str):
             return pickle.load(f)
     except Exception as e:
         print(f"[ERROR] Could not load '{filename}': {e}")
-        return None
-
-model           = _load("knn_model.pkl")
-scaler          = _load("scaler.pkl")
-le_sex          = _load("le_sex.pkl")
-le_angina       = _load("le_angina.pkl")
+        return N
+model = _load("knn_model.pkl")
+scaler = _load("scaler.pkl")
+le_sex = _load("le_sex.pkl")
+le_angina = _load("le_angina.pkl")
 feature_columns = _load("feature_columns.pkl")
 
 if model:
