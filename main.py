@@ -1,16 +1,3 @@
-"""
-main.py  —  CardioAI FastAPI Backend
-──────────────────────────────────────
-Start the server:
-    uvicorn main:app --reload --port 8000
-
-Then open:  http://localhost:8000
-Swagger UI: http://localhost:8000/docs      ← auto-generated API docs (free with FastAPI!)
-ReDoc UI:   http://localhost:8000/redoc
-
-Install dependencies first:
-    pip install fastapi uvicorn[standard] python-multipart scikit-learn pandas numpy
-"""
 
 import os
 import pickle
@@ -24,9 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 1 — Auto-build model artefacts if any are missing
-# ─────────────────────────────────────────────────────────────────────────────
+
 REQUIRED_FILES = [
     "knn_model.pkl",
     "scaler.pkl",
@@ -46,12 +31,7 @@ if not all(os.path.exists(f) for f in REQUIRED_FILES):
     except Exception as e:
         print(f"[STARTUP ERROR] {e}")
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 2 — Load all saved model artefacts
-# ─────────────────────────────────────────────────────────────────────────────
 def _load(filename: str):
-    """Load a pickle file and return the object, or None on failure."""
     try:
         with open(filename, "rb") as f:
             return pickle.load(f)
@@ -70,15 +50,9 @@ else:
     print("[WARNING] Model not loaded — /predict_risk will return 503.")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 3 — Pydantic input schema (auto-validates every incoming request)
-# ─────────────────────────────────────────────────────────────────────────────
+
 class PatientInput(BaseModel):
-    """
-    Defines the shape and rules for the JSON body sent by the frontend.
-    FastAPI automatically rejects requests that don't match — no manual
-    if/else validation needed.
-    """
+
 
     Age: int              = Field(..., ge=1,   le=120,  description="Age in years")
     Sex: str              = Field(...,          description="'M' or 'F'")
@@ -92,7 +66,7 @@ class PatientInput(BaseModel):
     Oldpeak: float        = Field(..., ge=0.0, le=7.0,  description="ST depression")
     ST_Slope: str         = Field(...,          description="Up | Flat | Down")
 
-    # Field-level validators — checked automatically before the endpoint runs
+
     @field_validator("Sex")
     @classmethod
     def validate_sex(cls, v: str) -> str:
@@ -129,37 +103,30 @@ class PatientInput(BaseModel):
         return v
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 4 — Output schema
-# ─────────────────────────────────────────────────────────────────────────────
 class PredictionOutput(BaseModel):
-    prediction:  int    # 0 = Low Risk, 1 = High Risk
-    probability: str    # e.g. "78.5"  (percentage as string, kept for frontend compat)
-    label:       str    # "Low Risk" or "High Risk"
+    prediction:  int  
+    probability: str  
+    label:       str    
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 5 — Create FastAPI app
-# ─────────────────────────────────────────────────────────────────────────────
+
 app = FastAPI(
     title       = "CardioAI — Heart Risk Predictor",
     description = "KNN-based cardiovascular disease risk assessment API.",
     version     = "2.0.0",
 )
 
-# CORS — allow any origin during development so the frontend can call this API
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins     = ["*"],   # tighten to your domain in production
+    allow_origins     = ["*"],   
     allow_credentials = True,
     allow_methods     = ["*"],
     allow_headers     = ["*"],
 )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 6 — Serve the frontend HTML file
-# ─────────────────────────────────────────────────────────────────────────────
+
 @app.get("/", response_class=FileResponse, include_in_schema=False)
 async def serve_frontend():
     """Serve index.html at the root URL so one server handles everything."""
@@ -169,23 +136,9 @@ async def serve_frontend():
     return FileResponse(str(html_path))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 7 — Prediction endpoint
-# ─────────────────────────────────────────────────────────────────────────────
 @app.post("/predict_risk", response_model=PredictionOutput)
 async def predict_risk(patient: PatientInput) -> PredictionOutput:
-    """
-    POST /predict_risk
-    ──────────────────
-    Accepts a JSON body matching PatientInput, runs the KNN model,
-    returns prediction (0 / 1) + confidence percentage.
 
-    FastAPI validates the input automatically using the Pydantic schema above.
-    If any field is wrong or missing, FastAPI returns a 422 error before this
-    function even runs.
-    """
-
-    # Guard — model not loaded
     if model is None:
         raise HTTPException(
             status_code = 503,
@@ -193,11 +146,10 @@ async def predict_risk(patient: PatientInput) -> PredictionOutput:
         )
 
     try:
-        # ── 7a. Label-encode binary categoricals ──────────────────────────────
         sex_enc    = int(le_sex.transform([patient.Sex])[0])
         angina_enc = int(le_angina.transform([patient.ExerciseAngina])[0])
 
-        # ── 7b. Build a single-row DataFrame ──────────────────────────────────
+   
         row = {
             "Age"           : [patient.Age],
             "Sex"           : [sex_enc],
@@ -213,30 +165,26 @@ async def predict_risk(patient: PatientInput) -> PredictionOutput:
         }
         input_df = pd.DataFrame(row)
 
-        # ── 7c. One-hot encode multi-class categoricals ───────────────────────
+       
         input_df = pd.get_dummies(
             input_df,
             columns=["ChestPainType", "RestingECG", "ST_Slope"],
             drop_first=True,
         )
 
-        # ── 7d. Align columns to training feature set ─────────────────────────
-        #   Some OHE columns may not appear in a single-row input (e.g. if the
-        #   user chose "ASY" but the training data has columns for ATA, NAP, TA).
-        #   We create a zero-filled frame with ALL training columns, then fill in
-        #   the ones that are present.
+
         final_input = pd.DataFrame(0, index=[0], columns=feature_columns)
         for col in input_df.columns:
             if col in final_input.columns:
                 final_input[col] = input_df[col].values
 
-        # ── 7e. Scale using the same scaler fitted during training ─────────────
+    
         scaled = scaler.transform(final_input)
 
-        # ── 7f. Predict class and probability ─────────────────────────────────
-        prediction  = int(model.predict(scaled)[0])          # 0 or 1
-        proba_array = model.predict_proba(scaled)[0]          # [P(0), P(1)]
-        confidence  = float(proba_array[prediction]) * 100   # probability of the predicted class
+     
+        prediction  = int(model.predict(scaled)[0])   
+        proba_array = model.predict_proba(scaled)[0]        
+        confidence  = float(proba_array[prediction]) * 100   
 
         return PredictionOutput(
             prediction  = prediction,
@@ -245,13 +193,10 @@ async def predict_risk(patient: PatientInput) -> PredictionOutput:
         )
 
     except Exception as e:
-        # Any unexpected error → 400 with details
+       
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 8 — Health check endpoint
-# ─────────────────────────────────────────────────────────────────────────────
 @app.get("/health")
 async def health():
     """Quick check — useful for deployment platforms to verify the app is alive."""
@@ -261,9 +206,6 @@ async def health():
     }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SECTION 9 — Entry-point (run with: python main.py)
-# ─────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
     port  = int(os.environ.get("PORT", 8000))
