@@ -29,7 +29,6 @@ User sees result  ←  JavaScript updates UI  ←  JSON response returned
 ```
 CardioAI/
 ├── main.py                 ← FastAPI backend (API + serves frontend)
-├── model_pipeline.py       ← Trains and saves all ML artefacts
 ├── index.html              ← Frontend UI (served by FastAPI)
 ├── heart.csv               ← Training dataset (918 records)
 │
@@ -95,8 +94,8 @@ CardioAI/
 
 ### 1. Clone the repo
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-cd YOUR_REPO_NAME
+git clone https://github.com/vansh7266/CardioAI.git
+cd CardioAI
 ```
 
 ### 2. Install dependencies
@@ -104,17 +103,12 @@ cd YOUR_REPO_NAME
 pip install -r requirements.txt
 ```
 
-### 3. Train the model (first time only)
-```bash
-python model_pipeline.py
-```
-
-### 4. Start the server
+### 3. Start the server
 ```bash
 uvicorn main:app --reload --port 8000
 ```
 
-### 5. Open in browser
+### 4. Open in browser
 ```
 http://localhost:8000        ← App
 http://localhost:8000/docs   ← Swagger API docs
@@ -186,7 +180,7 @@ This tool is for **educational purposes only**. It is not a substitute for profe
 
 ## 👨‍💻 Author
 
-**Vansh Gupta**
+**Vansh Gupta** — [@vansh7266](https://github.com/vansh7266)
 
 ---
 
